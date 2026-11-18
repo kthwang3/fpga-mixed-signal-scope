@@ -35,7 +35,7 @@ module top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR,
         .clk     (CLOCK_50),
         .resetn  (KEY[0]),
         .SW      (SW),
-        .KEY     (KEY[3:1]),
+        .KEY     (KEY),
         .gpio_in (GPIO[3:0]),      // digital channels CH0-CH3
         .LEDR    (LEDR),
         .HEX0    (HEX0), .HEX1(HEX1), .HEX2(HEX2),
