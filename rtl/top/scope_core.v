@@ -19,14 +19,18 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
     assign HEX4 = 7'b1111111;
     assign HEX5 = 7'b1111111;
     
-    assign x = 9'b0;
-    assign y = 8'b0;
-    assign colour = 9'b0;
-    assign write = 1'b0;
-
-
     wire req;
-    
+
+    digital_view d1 (
+        .clk (clk),
+        .resetn (resetn),
+        .grant (1'b1),
+        .x (x),
+        .y (y),
+        .colour (colour),
+        .plot (write)
+    );
+
 
 
 endmodule
