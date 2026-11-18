@@ -24,11 +24,12 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
     digital_view d1 (
         .clk (clk),
         .resetn (resetn),
-        .grant (1'b1),
+        .grant (req),
         .x (x),
         .y (y),
         .colour (colour),
-        .plot (write)
+        .plot (write),
+        .req (req)
     );
 
 
