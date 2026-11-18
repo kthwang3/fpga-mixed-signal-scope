@@ -1,0 +1,12 @@
+﻿db/
+incremental_db/
+output_files/
+simulation/modelsim/work/
+greybox_tmp/
+*.qws
+*.bak
+*.rpt
+*.summary
+work/
+transcript
+*.wlf
