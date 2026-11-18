@@ -32,22 +32,29 @@ Each half provides one drawing module with these ports:
 ```
 input            clk,       // CLOCK_50
 input            resetn,
-input            grant,     // 1 = arbiter accepts my pixel this cycle
+input            grant,     // 1 = I own the screen this cycle
+output           req,       // 1 = I want the screen (hold for the whole frame)
 output [8:0]     x,
 output [7:0]     y,
-output [8:0]     colour,
-output           plot       // 1 = I want to write (x, y, colour)
+output [8:0]     colour,    // RRRGGGBBB
+output           plot       // 1 = write (x, y, colour) this cycle
 ```
 
-Handshake: a pixel is written **only on a cycle where `plot && grant`**.
-Hold `x`, `y`, `colour`, `plot` steady until that happens, then move to the next pixel.
+Handshake (request/grant, same pattern as the course VGA "animate" example):
+1. Raise `req` when you want to draw a frame (erase + redraw).
+2. Wait until `grant` is 1. Only advance your pixel counters and assert `plot` while `grant` is 1.
+3. Drop `req` when the frame is done, so the other module gets a turn.
 
-## 4. Write arbiter (owned by Kyle, in the top level)
+Don't hold `req` forever, or the other half never gets drawn.
 
-- The adapter has one write port, so the arbiter alternates `grant` between the
-  two drawing modules every clock (each gets about 25 M pixel writes per second).
+## 4. Write arbiter (owned by Kyle, in `scope_core`)
+
+- The adapter has one write port, so only one module may draw at a time.
+- Request/grant arbiter (pattern from the course VGA "animate" example):
+  when idle, grant whichever module is requesting; that module keeps `grant`
+  until it drops `req`, then the arbiter returns to idle.
 - It forwards the granted module's `x`, `y`, `colour`, `plot` to the adapter.
-- If only one module is plotting, it can take every cycle.
+- Until the arbiter exists, `scope_core` ties `digital_view`'s `grant` to 1.
 
 ## 5. Inputs on the board
 
@@ -69,7 +76,8 @@ Hold `x`, `y`, `colour`, `plot` steady until that happens, then move to the next
 ```
 rtl/analog/     Anita's modules
 rtl/digital/    Kyle's modules
-rtl/top/        top level, arbiter, VGA adapter instance (Kyle)
+rtl/top/        scope_core (whole project, arbiter) + course VGA adapters (Kyle)
+desim/          DESim wrapper (top.v), tb, compile scripts
 sim/            ModelSim testbenches, one folder per module
 docs/           this file, block diagrams, milestone write-ups
 ```
@@ -87,5 +95,6 @@ Each person works in their own folder; changes to `rtl/top/` or this file are di
 ## 8. Open questions
 
 - [ ] Confirm the board's ADC chip and input range (LTC2308: 0–4.096 V unipolar).
-- [ ] Confirm the adapter's memory use at 320 × 240 × 9 bits leaves room for our capture RAMs.
+- [x] Confirm the adapter's memory use at 320 × 240 × 9 bits leaves room for our capture RAMs.
+      (691,200 bits ≈ 68 of 446 on-chip RAM blocks, about 15%.)
 - [ ] Who presents which slides.
