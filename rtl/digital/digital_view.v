@@ -25,7 +25,19 @@ module digital_view (clk, resetn, grant, x, y, colour, plot, req);
     assign Y[3] = resetn && y_Q[2] && last_pixel && grant;                            //done, 1 clock
 
     assign req = y_Q[1] | y_Q[2];
-    assign colour = 9'b000_111_000; //green green me say alone ramp
+    // ---- what to draw at (x, y) ----
+    parameter HIGH = 150;   // row for logic 1
+    parameter LOW  = 210;   // row for logic 0
+
+    wire [8:0] xm1    = x - 1;      // previous column
+    wire       s      = x[4];       // fake data: square wave, flips every 16 columns
+    wire       s_prev = xm1[4];     // fake data at the previous column
+
+    wire on_level = (y == (s ? HIGH : LOW));               // horizontal part of the trace
+    wire on_edge  = (s != s_prev) && (y >= HIGH) && (y <= LOW); // vertical line where it switches
+    wire on_trace = on_level || on_edge;
+
+    assign colour = on_trace ? 9'b000_111_000 : 9'b000_000_000; // green trace, black elsewhere (erases)
     assign plot = y_Q[2] && grant;
 
     always @(posedge clk)
