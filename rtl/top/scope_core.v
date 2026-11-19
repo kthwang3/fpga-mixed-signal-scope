@@ -1,4 +1,6 @@
 module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, x, y, colour, write);
+    parameter DV_DELAY = 1666666;   // digital_view redraw delay; desim/top.v overrides to 1000
+
     input  wire        clk;   // 50 MHz clock
     input  wire        resetn;
     input  wire [9:0]  SW;         // switches
@@ -21,7 +23,7 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
     
     wire req;
 
-    digital_view d1 (
+    digital_view #(.DELAY(DV_DELAY)) d1 (
         .clk (clk),
         .resetn (resetn),
         .grant (req),

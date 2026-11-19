@@ -9,7 +9,7 @@ module digital_view (clk, resetn, grant, x, y, colour, plot, req);
     output wire plot;
     output wire req;
 
-    parameter DELAY = 1000;   // 50 MHz / 30 ≈ 1.67M clks → redraw ~30 times/sec , on DESIM set to 1000 board set 1 666 666
+    parameter DELAY = 1666666;   // 50 MHz / 30 ≈ 1.67M clks → redraw ~30 times/sec (board). DESim overrides to 1000, ModelSim to 5.
     reg [20:0] delay_cnt;
 
     wire[3:0] y_Q; //present state

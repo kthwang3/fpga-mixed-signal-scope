@@ -1,0 +1,11 @@
+-- Black background for the course VGA adapter at 320x240, 9-bit colour.
+-- One word per pixel: 320 x 240 = 76800 words, each 9 bits (RRRGGGBBB), all 0.
+WIDTH=9;
+DEPTH=76800;
+
+ADDRESS_RADIX=UNS;
+DATA_RADIX=UNS;
+
+CONTENT BEGIN
+	[0..76799]  :   0;
+END;

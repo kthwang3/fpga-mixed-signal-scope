@@ -31,7 +31,8 @@ module top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR,
     wire [8:0] core_colour;
     wire       core_write;
 
-    scope_core CORE (
+    // DESim simulates slowly, so redraw after 1000 clocks instead of ~1.67M
+    scope_core #(.DV_DELAY(1000)) CORE (
         .clk     (CLOCK_50),
         .resetn  (KEY[0]),
         .SW      (SW),
