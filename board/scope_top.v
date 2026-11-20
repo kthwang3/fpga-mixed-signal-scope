@@ -12,7 +12,7 @@
 `default_nettype none
 
 module scope_top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR, GPIO_0,
-                  VGA_R, VGA_G, VGA_B, VGA_HS, VGA_VS, VGA_BLANK_N, VGA_SYNC_N, VGA_CLK);
+                  VGA_R, VGA_G, VGA_B, VGA_HS, VGA_VS, VGA_BLANK_N, VGA_SYNC_N, VGA_CLK, ADC_CS_N, ADC_SCLK, ADC_DIN, ADC_DOUT);
 
     input  wire        CLOCK_50;   // 50 MHz clock
     input  wire [9:0]  SW;         // switches
@@ -29,6 +29,11 @@ module scope_top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR, G
     output wire        VGA_BLANK_N;
     output wire        VGA_SYNC_N;
     output wire        VGA_CLK;
+
+    output wire ADC_CS_N;
+    output wire ADC_SCLK;
+    output wire ADC_DIN;
+    input wire ADC_DOUT;
 
     parameter RESOLUTION  = "320x240";
     parameter COLOR_DEPTH = 9;
