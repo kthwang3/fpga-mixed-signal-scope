@@ -47,7 +47,7 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
     wire       cap_full;
     wire       cap_start;
 
-    /* gpio_capture #(.N(CAP_N)) cap0 (
+    gpio_capture #(.N(CAP_N)) cap0 (
         .clk     (clk),
         .resetn  (resetn),
         .start   (cap_start),
@@ -57,36 +57,61 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
         .full    (cap_full)
     );
 
-    wire req;
+    wire dv_req, av_req; //requests
+    wire dv_grant, av_grant; //grants
+    //digital view and analog has its own set of wires
+    wire [8:0] dv_x, av_x;
+    wire [7:0] dv_y, av_y;
+    wire [8:0] dv_colour, av_colour;
+    wire dv_plot, av_plot;
 
     digital_view #(.DELAY(DV_DELAY)) d1 (
         .clk           (clk),
         .resetn        (resetn),
-        .grant         (req),          // no arbiter yet: granted as soon as it asks
+        .grant         (dv_grant),
+        .req           (dv_req),
         .sample        (rd_data),
         .ready         (cap_full),
-        .x             (x),
-        .y             (y),
-        .colour        (colour),
-        .plot          (write),
-        .req           (req),
+        .x             (dv_x),
+        .y             (dv_y),
+        .colour        (dv_colour),
+        .plot          (dv_plot),
         .rd_addr       (rd_addr),
         .start_capture (cap_start)
-    ); */
+    );
 
     analog_view d2 (
         .clk (clk),
         .resetn (resetn),
-        .grant (1'b0),
-        .xpixel (x),
-        .ypixel (y),
-        .colour (colour),
-        .plot (write),
-        .req (),
+        .grant (av_grant),
+        .xpixel (av_x),
+        .ypixel (av_y),
+        .colour (av_colour),
+        .plot (av_plot),
+        .req (av_req),
         .adc_cs_n (adc_cs_n),
         .adc_saddr (adc_saddr),
         .adc_sclk (adc_sclk),
         .adc_sdat (adc_sdat)
     );
+    arbiter ARB (
+        .clk (clk),
+        .resetn (resetn),
+        .r ({av_req, dv_req}), // r[1] == analog, r[0] == digital
+        .g ({av_grant, dv_grant})
+    );
 
+    wire use_analog = av_grant | SW[9];   // SW[9] = temporary override, see below
+    assign x      = use_analog ? av_x      : dv_x;
+    assign y      = use_analog ? av_y      : dv_y;
+    assign colour = use_analog ? av_colour : dv_colour;
+    assign write  = use_analog ? av_plot   : dv_plot;
+
+    /*
+    //TEMPORARY: UNTIL WE HAVE ARBITER DOWN = DIGITAL HALF, UP = ANALOG
+    assign x      = SW[9] ? av_x      : dv_x;
+    assign y      = SW[9] ? av_y      : dv_y;
+    assign colour = SW[9] ? av_colour : dv_colour;
+    assign write  = SW[9] ? av_plot   : dv_plot;
+    */
 endmodule
