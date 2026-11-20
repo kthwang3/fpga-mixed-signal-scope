@@ -40,24 +40,24 @@ module testbench ( );
     // no arbiter yet: granted as soon as it asks (same as scope_core)
     assign grant = req;
 
-    // ---------------- clock ----------------
+    // clock
     initial clk = 1'b0;
     always #(CLOCK_PERIOD/2) clk = ~clk;
 
-    // ---------------- reset ----------------
+    //reset
     initial begin
-        resetn = 1'b0;               // hold reset for 3 clocks
+        resetn = 1'b0;  // hold reset for 3 clocks
         #(3*CLOCK_PERIOD) resetn = 1'b1;
     end
 
-    // ---------------- device under test ----------------
+    //device under test
     // DELAY overridden to 5 so we don't simulate 1.67M idle clocks
     digital_view #(.DELAY(5)) DUT (
         .clk           (clk),
         .resetn        (resetn),
         .grant         (grant),
         .sample        (sample),
-        .ready         (1'b1),        // pretend a recording is always ready
+        .ready         (1'b1),  // pretend a recording is always ready
         .x             (x),
         .y             (y),
         .colour        (colour),
@@ -67,11 +67,11 @@ module testbench ( );
         .start_capture (start_capture)
     );
 
-    // ---------------- fake capture RAM ----------------
+    // fake capture RAM 
     // slot a holds (a/16) % 2; answers 1 clock after the address, like gpio_capture
     always @(posedge clk) sample <= (rd_addr / 16) % 2;
 
-    // ---------------- reference model ----------------
+    // reference model
     // Expected colour, written independently of the DUT:
     // the signal is 1 on columns 16-31, 48-63, ... (x/16 is odd),
     // and an edge is drawn on every 16th column.
@@ -80,7 +80,7 @@ module testbench ( );
     wire       ref_edge  = (x % 16 == 0) && (x != 0) && (y >= HIGH) && (y <= LOW); // no edge at column 0
     wire [8:0] ref_colour = ((y == ref_row) || ref_edge) ? GREEN : BLACK;
 
-    // ---------------- checker (scoreboard) ----------------
+    // checker (scoreboard) 
     integer errors     = 0;
     integer pixels     = 0;   // pixels plotted in the current frame
     integer frames     = 0;

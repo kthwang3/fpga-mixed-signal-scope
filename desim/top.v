@@ -48,7 +48,7 @@ module top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR,
         .y       (core_y),
         .colour  (core_colour),
         .write   (core_write),
-        .test_wave ()              // DESim can't loop a pin back; use SW[0]=1 instead
+        .test_wave ()              // DESim can't loop a pin back, use SW[0]=1 instead
     );
 
     // VGA_MEMORY is not defined, so the adapter has no background image:

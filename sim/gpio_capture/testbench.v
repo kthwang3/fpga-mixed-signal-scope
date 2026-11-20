@@ -30,18 +30,18 @@ module testbench ( );
     wire       full;
 
     integer errors = 0;
-    integer test   = 0;              // which test is running (shown in wave.do)
+    integer test   = 0;  // which test is running (shown in wave.do)
     integer a;
 
-    // ---------------- clock ----------------
+    // clock
     initial clk = 1'b0;
     always #(CLOCK_PERIOD/2) clk = ~clk;
 
-    // ---------------- input signal ----------------
+    // input signal 
     // new random bit on every falling edge (inputs change away from the rising edge)
     always @(negedge clk) gpio_in <= $random;
 
-    // ---------------- device under test ----------------
+    // device under test 
     gpio_capture #(.N(N)) DUT (
         .clk     (clk),
         .resetn  (resetn),
@@ -52,7 +52,7 @@ module testbench ( );
         .full    (full)
     );
 
-    // ---------------- reference model ----------------
+    // reference model 
     // Written separately from the DUT: what SHOULD be in each slot.
     //   g2      = gpio_in delayed 2 clocks (what the synchronizer outputs)
     //   ref_cnt = its own sample counter, ref_k = how many samples stored so far
@@ -82,7 +82,7 @@ module testbench ( );
         end
     end
 
-    // ---------------- checker: full flag, every clock ----------------
+    //checker: full flag every clock
     always @(negedge clk)
         if (resetn && full !== (ref_k == 320)) begin
             if (errors < 10)
@@ -90,7 +90,7 @@ module testbench ( );
             errors = errors + 1;
         end
 
-    // ---------------- read all 320 slots and compare ----------------
+    // read all 320 slots and compare
     // Address changes every clock; the answer for address a arrives
     // one clock later, so we check slot a-1 while asking for slot a.
     task read_back;
@@ -109,7 +109,7 @@ module testbench ( );
         end
     endtask
 
-    // ---------------- test sequence ----------------
+    // test sequence
     initial begin
         rd_addr = 0;
         start   = 0;
