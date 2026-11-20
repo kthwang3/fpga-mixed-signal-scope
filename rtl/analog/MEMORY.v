@@ -12,8 +12,7 @@ module memory (
 	
 	// memory is in sample units
 	// each sample contains 12 bits
-	// total 7680 bits
-	reg [11:0] memory [0:639];
+	reg [11:0] memory [0:319];
 	reg [9:0] write_addr;
 	
 	always @(posedge CLOCK_50) begin
@@ -32,13 +31,13 @@ module memory (
 				memory[write_addr] <= adc_data;
 				
 				// capture once 640 samples
-				if (write_addr == 10'd639) captured <= 1'b1;
+				if (write_addr == 10'd319) captured <= 1'b1;
 				else write_addr <= write_addr + 1'b1;
 			end
 		end
 	end
 	
-	// set output (read_data) to the 640 samples stored at the location requested (read_addr)
-	assign read_data = memory[read_addr];
+	// set output (read_data) to the 320 samples stored at the location requested (read_addr)
+	assign read_data <= memory[read_addr];
 	
 endmodule
