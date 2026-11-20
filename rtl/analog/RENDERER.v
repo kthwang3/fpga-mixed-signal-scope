@@ -24,11 +24,11 @@ module waveform_renderer (
 	wire waveform_pixel;
 
 	// assign sample_address based on x coord
-	assign sample_address = (pixel_x > 10'd639) ? 10'd639 : pixel_x;
+	assign sample_address = (pixel_x > 10'd319) ? 10'd319 : pixel_x;
 	
 	// map every possible of sampled to the max height of the vga
-	assign scaled_value = sample_value * 9'd479;
-	assign trace_y = 10'd479 - (scaled_value / 12'd4095);
+	assign scaled_value = sample_value * 9'd119;
+	assign trace_y = 10'd119 - (scaled_value / 12'd4095);
 
 	// distance between current point and next
 	assign pixel_difference =
@@ -42,8 +42,8 @@ module waveform_renderer (
 	// 5 pixel waveform
 	assign waveform_pixel =
 		video_on && 
-		(pixel_x < 10'd640) &&
-		(pixel_y < 10'd480) &&
+		(pixel_x < 10'd320) &&
+		(pixel_y < 10'd120) &&
 		(pixel_difference <= 10'd2);
 
 	// assign waverform colours
