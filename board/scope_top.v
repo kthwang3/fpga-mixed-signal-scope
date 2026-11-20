@@ -43,6 +43,7 @@ module scope_top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR, G
     wire [7:0] core_y;
     wire [8:0] core_colour;
     wire       core_write;
+    wire       test_wave;
 
     // No DV_DELAY override: the board uses scope_core's default (~30 redraws/sec)
     scope_core CORE (
@@ -57,7 +58,8 @@ module scope_top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR, G
         .x       (core_x),
         .y       (core_y),
         .colour  (core_colour),
-        .write   (core_write)
+        .write   (core_write),
+        .test_wave (test_wave)
     );
 
     // Board adapter: framebuffer (dual-port RAM) + VGA controller + 25 MHz PLL.
@@ -82,8 +84,18 @@ module scope_top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR, G
         // starting screen: all black, sized for 320x240 x 9-bit (76,800 words)
         defparam VGA.BACKGROUND_IMAGE = "black_320_9.mif";
 
-    // We only read GPIO, never drive it
-    assign GPIO_0 = 36'bz;
+    // GPIO_0[3:0] = CH0-CH3 inputs (never driven).
+    // GPIO_0[4] (header pin 5) outputs the test square wave:
+    // jumper header pin 5 -> pin 1 (GPIO_0[0]) to see it on CH0 with SW[0]=0.
+    assign GPIO_0[3:0]  = 4'bz;
+    assign GPIO_0[4]    = test_wave;
+    assign GPIO_0[35:5] = 31'bz;
+
+    // ADC not wired in yet: hold it idle (chip select is active-low, so 1 = off)
+    // until analog_view drives these.
+    assign ADC_CS_N = 1'b1;
+    assign ADC_SCLK = 1'b0;
+    assign ADC_DIN  = 1'b0;
 
 endmodule
 

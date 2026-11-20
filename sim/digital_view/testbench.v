@@ -9,6 +9,11 @@
 //   3. its colour matches a reference model of the square-wave trace
 //   4. each frame plots exactly 320 x 120 = 38400 pixels
 // Prints PASS or the number of errors at the end.
+//
+// gpio_capture is replaced by a fake RAM holding a known square wave
+// (slot a = (a/16) % 2) with the same 1-clock read delay as the real one.
+// If digital_view asked for the wrong column, edges land 1 column off
+// and check 3 fails.
 
 module testbench ( );
 
@@ -28,6 +33,9 @@ module testbench ( );
     wire [7:0] y;
     wire [8:0] colour;
     wire       plot;
+    wire [8:0] rd_addr;          // digital_view asks the capture RAM for this column
+    wire       start_capture;
+    reg        sample;           // fake capture RAM's answer
 
     // no arbiter yet: granted as soon as it asks (same as scope_core)
     assign grant = req;
@@ -45,15 +53,23 @@ module testbench ( );
     // ---------------- device under test ----------------
     // DELAY overridden to 5 so we don't simulate 1.67M idle clocks
     digital_view #(.DELAY(5)) DUT (
-        .clk    (clk),
-        .resetn (resetn),
-        .grant  (grant),
-        .x      (x),
-        .y      (y),
-        .colour (colour),
-        .plot   (plot),
-        .req    (req)
+        .clk           (clk),
+        .resetn        (resetn),
+        .grant         (grant),
+        .sample        (sample),
+        .ready         (1'b1),        // pretend a recording is always ready
+        .x             (x),
+        .y             (y),
+        .colour        (colour),
+        .plot          (plot),
+        .req           (req),
+        .rd_addr       (rd_addr),
+        .start_capture (start_capture)
     );
+
+    // ---------------- fake capture RAM ----------------
+    // slot a holds (a/16) % 2; answers 1 clock after the address, like gpio_capture
+    always @(posedge clk) sample <= (rd_addr / 16) % 2;
 
     // ---------------- reference model ----------------
     // Expected colour, written independently of the DUT:
@@ -61,7 +77,7 @@ module testbench ( );
     // and an edge is drawn on every 16th column.
     wire       ref_bit   = (x / 16) % 2;
     wire [7:0] ref_row   = ref_bit ? HIGH : LOW;
-    wire       ref_edge  = (x % 16 == 0) && (y >= HIGH) && (y <= LOW);
+    wire       ref_edge  = (x % 16 == 0) && (x != 0) && (y >= HIGH) && (y <= LOW); // no edge at column 0
     wire [8:0] ref_colour = ((y == ref_row) || ref_edge) ? GREEN : BLACK;
 
     // ---------------- checker (scoreboard) ----------------

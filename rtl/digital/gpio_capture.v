@@ -1,4 +1,4 @@
-module gpio_capture (clk, resetn, gpio_in, rd_addr, rd_data, full);
+module gpio_capture (clk, resetn, start, gpio_in, rd_addr, rd_data, full);
     //rd_addr = read addresss that digital_view asks for
     //rd_data = the answer that is stored in the RAM address
 
@@ -6,6 +6,7 @@ module gpio_capture (clk, resetn, gpio_in, rd_addr, rd_data, full);
 
     input wire clk;
     input wire resetn;
+    input wire start;   // 1-clock pulse: re-arm, record a fresh 320 samples from slot 0
     input wire gpio_in;
     input wire [8:0] rd_addr;
     output reg rd_data;
@@ -32,14 +33,14 @@ module gpio_capture (clk, resetn, gpio_in, rd_addr, rd_data, full);
         else dec_cnt <= dec_cnt + 1;
     
     always @(posedge clk)
-        if (!resetn) wr_addr <= 0;
+        if (!resetn || start) wr_addr <= 0;
         else if (tick && !full) begin
             mem[wr_addr] <= sync2;
             wr_addr <= wr_addr + 1;
         end
         
     always @(posedge clk)
-        if (!resetn) full <= 0;
+        if (!resetn || start) full <= 0;
         else if (tick && wr_addr == 319) full <= 1; // just wrote the last slot
 
 endmodule

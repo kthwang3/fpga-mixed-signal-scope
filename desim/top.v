@@ -31,8 +31,11 @@ module top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR,
     wire [8:0] core_colour;
     wire       core_write;
 
-    // DESim simulates slowly, so redraw after 1000 clocks instead of ~1.67M
-    scope_core #(.DV_DELAY(1000)) CORE (
+    // DESim simulates slowly, so everything is scaled down:
+    //   redraw after 1000 clocks instead of ~1.67M,
+    //   sample every 10 clocks instead of 650 (a recording takes 3200 clocks),
+    //   test wave from counter bit 9 instead of 15 (same ~3 periods on screen)
+    scope_core #(.DV_DELAY(1000), .CAP_N(10), .WAVE_BIT(9)) CORE (
         .clk     (CLOCK_50),
         .resetn  (KEY[0]),
         .SW      (SW),
@@ -44,7 +47,8 @@ module top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR,
         .x       (core_x),
         .y       (core_y),
         .colour  (core_colour),
-        .write   (core_write)
+        .write   (core_write),
+        .test_wave ()              // DESim can't loop a pin back; use SW[0]=1 instead
     );
 
     // VGA_MEMORY is not defined, so the adapter has no background image:

@@ -12,6 +12,7 @@
 // Test 3  read   : read all 320 slots back-to-back (like digital_view does)
 //                  and compare with the reference model, 1-clock read latency
 // Test 4  rerun  : press reset again, record new data, read it back again
+// Test 5  re-arm : pulse start (no reset), record fresh data, read it back
 //
 // Prints PASS or the number of errors at the end, then $stop.
 
@@ -22,6 +23,7 @@ module testbench ( );
 
     reg        clk;
     reg        resetn;
+    reg        start;
     reg        gpio_in;
     reg  [8:0] rd_addr;
     wire       rd_data;
@@ -43,6 +45,7 @@ module testbench ( );
     gpio_capture #(.N(N)) DUT (
         .clk     (clk),
         .resetn  (resetn),
+        .start   (start),
         .gpio_in (gpio_in),
         .rd_addr (rd_addr),
         .rd_data (rd_data),
@@ -66,13 +69,17 @@ module testbench ( );
         end
         else if (ref_cnt == N-1) begin
             ref_cnt <= 0;
-            if (ref_k < 320) begin
+            if (start)                 // re-arm: start over at slot 0
+                ref_k <= 0;
+            else if (ref_k < 320) begin
                 ref_mem[ref_k] <= g2;
                 ref_k          <= ref_k + 1;
             end
         end
-        else
+        else begin
             ref_cnt <= ref_cnt + 1;
+            if (start) ref_k <= 0;     // re-arm: start over at slot 0
+        end
     end
 
     // ---------------- checker: full flag, every clock ----------------
@@ -105,6 +112,7 @@ module testbench ( );
     // ---------------- test sequence ----------------
     initial begin
         rd_addr = 0;
+        start   = 0;
 
         // Test 1: reset for 3 clocks, then let it record until full
         test = 1;
@@ -136,7 +144,19 @@ module testbench ( );
         read_back;
         $display("Test 4: re-recorded and read back, errors so far = %0d", errors);
 
-        if (errors == 0) $display("PASS: all 4 tests passed");
+        // Test 5: re-arm with a 1-clock start pulse (no reset), like digital_view does
+        test = 5;
+        @(negedge clk) start = 1;
+        @(negedge clk) start = 0;
+        if (full !== 1'b0) begin
+            $display("ERROR t=%0t: full did not clear on start", $time);
+            errors = errors + 1;
+        end
+        @(posedge full);
+        read_back;
+        $display("Test 5: re-armed with start and read back, errors so far = %0d", errors);
+
+        if (errors == 0) $display("PASS: all 5 tests passed");
         else             $display("FAIL: %0d errors", errors);
         $stop;
     end

@@ -14,6 +14,7 @@ set_global_assignment -name SDC_FILE scope_top.sdc
 set_global_assignment -name VERILOG_FILE scope_top.v
 set_global_assignment -name VERILOG_FILE ../rtl/top/scope_core.v
 set_global_assignment -name VERILOG_FILE ../rtl/digital/digital_view.v
+set_global_assignment -name VERILOG_FILE ../rtl/digital/gpio_capture.v
 set_global_assignment -name VERILOG_FILE ../rtl/top/vga_adapter_board/vga_adapter.v
 set_global_assignment -name VERILOG_FILE ../rtl/top/vga_adapter_board/vga_address_translator.v
 set_global_assignment -name VERILOG_FILE ../rtl/top/vga_adapter_board/vga_controller.v

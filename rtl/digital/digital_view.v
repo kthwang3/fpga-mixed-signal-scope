@@ -1,13 +1,17 @@
-module digital_view (clk, resetn, grant, x, y, colour, plot, req);
+module digital_view (clk, resetn, grant, sample, ready, x, y, colour, plot, req, rd_addr, start_capture);
 
     input wire clk;
     input wire resetn;
     input wire grant;
+    input wire sample;    // stored 0/1 for column rd_addr, from gpio_capture (1 clock late)
+    input wire ready;    // gpio_capture is full: a complete recording is ready to draw. we can only start when we have everything
     output reg [8:0] x;
     output reg [7:0] y;
     output wire [8:0] colour;
     output wire plot;
     output wire req;
+    output wire [8:0] rd_addr;      // which column's sample to read from gpio_capture
+    output wire start_capture;      // pulse: tell gpio_capture to record again
 
     parameter DELAY = 1666666;   // 50 MHz / 30 ≈ 1.67M clks → redraw ~30 times/sec (board). DESim overrides to 1000, ModelSim to 5.
     reg [20:0] delay_cnt;
@@ -19,19 +23,30 @@ module digital_view (clk, resetn, grant, x, y, colour, plot, req);
     wire last_pixel = (x == 319) && (y == 239);
 
     // each state: (enter from previous state) || (stay because not finished)
-    assign Y[0] = ~resetn || y_Q[3] || (y_Q[0] && !delay_done);                   //wait, delay counter counts up
-    assign Y[1] = resetn && ((y_Q[0] && delay_done) || (y_Q[1] && !grant));         //req, wait for grant
+    // WAIT leaves only when the delay is over AND a full recording is ready
+    assign Y[0] = ~resetn || y_Q[3] || (y_Q[0] && !(delay_done && ready));        //wait, delay counter counts up
+    assign Y[1] = resetn && ((y_Q[0] && delay_done && ready) || (y_Q[1] && !grant)); //req, wait for grant
     assign Y[2] = resetn && ((y_Q[1] && grant) || (y_Q[2] && !(last_pixel && grant))); //sweep, run x/y counters
     assign Y[3] = resetn && y_Q[2] && last_pixel && grant;                            //done, 1 clock
 
     assign req = y_Q[1] | y_Q[2];
-    // ---- what to draw at (x, y) ----
+    assign start_capture = y_Q[3];  // DONE (1 clock): frame drawn, record a fresh one
+
+    //reading samples from gpio_capture
+    // The RAM answers 1 clock late, so we ask for the column x will be
+    // on next clock. Then when x gets there, its sample has just arrived.
+    wire advance = y_Q[2] && grant; // x moves this clock, used to be x <= x + 1
+    assign rd_addr = !advance ? x : ((x == 319) ? 9'd0 : x + 9'd1);
+
+    //what to draw at (x, y)
     parameter HIGH = 150;   // row for logic 1
     parameter LOW  = 210;   // row for logic 0
 
-    wire [8:0] xm1    = x - 1;      // previous column
-    wire       s      = x[4];       // fake data: square wave, flips every 16 columns
-    wire       s_prev = xm1[4];     // fake data at the previous column
+    wire s = sample; // the recorded 0/1 for column x
+    reg  s_last; // the sample of the column we just drew
+    always @(posedge clk)
+        if (advance) s_last <= s;
+    wire s_prev = (x == 0) ? s : s_last;   // column 0 has no column before it: no edge
 
     wire on_level = (y == (s ? HIGH : LOW));               // horizontal part of the trace
     wire on_edge  = (s != s_prev) && (y >= HIGH) && (y <= LOW); // vertical line where it switches
