@@ -1,70 +1,71 @@
-module analog_view (clk, resetn, start, grant, xpixel, ypixel, colour, plot, req, adc_cs_n, adc_saddr, adc_sclk, adc_sdat, adc_data);
+module analog_view (clk, resetn, grant, xpixel, ypixel, colour, plot, req, adc_cs_n, adc_saddr, adc_sclk, adc_sdat);
 
     input wire clk;
     input wire resetn;
-    input wire start;
 
     // arbiter
     input wire grant;
     output wire req;
+    assign req = 1'b0;
 
     // vga
-    output reg [8:0] xpixel;
-    output reg [7:0] ypixel;
+    output wire [8:0] xpixel;
+    output wire [7:0] ypixel;
     output wire [8:0] colour;
     output wire plot;
     
-    wire busy;
-    assign busy = 1'b0;
+    wire busy, data_valid, start, captured, startcapture;
 
-    wire data_valid;
-    assign data_valid = 1'b0;
+    wire [11:0] adc_data, read_data;
+    wire [8:0] read_addr;
 
-    wire reg [11:0] adc_data;
-
-    read_addr
-    read_data
-    captured
-    
+    output wire adc_cs_n;
+    output wire adc_saddr;
+    output wire adc_sclk;
+    input wire adc_sdat;
 
     sampler SAMPLER (
-        .CLOCK_50 (clk)
-        .resetn (resetn)
-        .busy (busy)
+        .CLOCK_50 (clk),
+        .resetn (resetn),
+        .busy (busy),
+        .start (start)
     );
 
     adc_controller ADC (
-        .CLOCK_50 (clk)
-        .resetn (resetn)
-        .start (start)
-        .adc_cs_n (adc_cs_n)
-        .adc_saddr (adc_saddr)
-        .adc_sclk (adc_sclk)
-        .adc_sdat (adc_sdat)
-        .adc_data (adc_data)
-        .data_valid (data_valid)
+        .CLOCK_50 (clk),
+        .resetn (resetn),
+        .start (start),
+        .adc_cs_n (adc_cs_n),
+        .adc_saddr (adc_saddr),
+        .adc_sclk (adc_sclk),
+        .adc_sdat (adc_sdat),
+        .adc_data (adc_data),
+        .data_valid (data_valid),
         .busy (busy)
     );
 
     memory MEMORY (
-        .CLOCK_50 (clk)
-        .resetn (resetn)
-        .adc_data (adc_data)
-        .data_valid (data_valid)
-        .read_addr (read_addr)
-        .read_data (read_data)
-        .captured (captured)
+        .CLOCK_50 (clk),
+        .resetn (resetn),
+        .adc_data (adc_data),
+        .data_valid (data_valid),
+        .read_addr (read_addr),
+        .read_data (read_data),
+        .captured (captured),
+        .startcapture (startcapture)
     );
 
     waveform_renderer RENDERER (
-        .pixel_x (xpixel)
-        .pixel_y (ypixel)
-        .video_on (video_on)
-        .sample_address (read_addr)
-        .sample_value (sample_value)
-        .VGA_R (VGA_R)
-        .VGA_G (VGA_G)
-        .VGA_B (VGA_B)
+        .CLOCK_50 (clk),
+        .resetn (resetn),
+        .captured (captured),
+        .startcapture (startcapture),
+        .read_addr (read_addr),
+        .read_data (read_data),
+        .x (xpixel),
+        .y (ypixel),
+        .colour (colour),
+        .plot (plot)
     );
 
 endmodule
@@ -111,9 +112,9 @@ endmodule
 
 module adc_controller #(
 	// 1/2 period = 20ns x  25 = 0.5us
-	parameter HALF_PERIOD = 25; 
+	parameter HALF_PERIOD = 25, 
 	// select channel 0 of 8
-	parameter [2:0] ADC_CHANNEL = 3'd0 );
+	parameter [2:0] ADC_CHANNEL = 3'd0 )
 	(
 	input CLOCK_50,
 	input resetn,
@@ -127,12 +128,12 @@ module adc_controller #(
 
 	output reg [11:0] adc_data, // dout 12 bits
 	output reg data_valid,
-	output reg busy,
+	output reg busy );
 	
 	// FSM states
 	
 	localparam IDLE = 2'b00;
-	localparam TRANSFER = 2'b01 );
+	localparam TRANSFER = 2'b01;
 	
 	reg [1:0] state; // state register represented by 2 bits for 4 states
 	
@@ -183,12 +184,12 @@ module adc_controller #(
 					
 					IDLE: begin
 						adc_cs_n <= 1'b1;
-						adc_sclk <= 1'b0;
+						adc_sclk <= 1'b1;
 						busy <= 1'b0;
 						
 						if (start) begin
 							adc_cs_n <= 1'b0; // select chip! (to activate ADC)
-							adc_sclk <= 1'b0; // start low
+							adc_sclk <= 1'b1; // start low
 							adc_saddr <= 1'b0; // according to timing diagram, 2 cycles (0, 1) are idle
 							clk_count <= 4'd0;
 							sr <= 12'd0;
@@ -223,7 +224,7 @@ module adc_controller #(
 								if (clk_count >= 4'd4) 
 									sr <= {sr[10:0], adc_sdat};
 								// on the final bit, make adc_data into its reversed bits and data is valid
-								if (clk_count == 4'd14) begin
+								if (clk_count == 4'd15) begin
 									adc_data <= {sr[10:0], adc_sdat};
 									data_valid <= 1'b1;
 									adc_cs_n <= 1'b1;
@@ -247,11 +248,12 @@ module memory (
 	
 	input [11:0] adc_data,
 	input data_valid,
+    input startcapture,
 	
-	input [9:0] read_addr, // 10 bits to store up to 640 samples
-	output [11:0] read_data,
+	input [8:0] read_addr, // 10 bits to store up to 640 samples
 	
-	output reg captured );
+	output reg captured,
+    output reg [11:0] read_data );
 	
 	// memory is in sample units
 	// each sample contains 12 bits
@@ -260,7 +262,7 @@ module memory (
 	
 	always @(posedge CLOCK_50) begin
 		
-		if (!resetn) begin
+		if (!resetn || startcapture) begin
 			write_addr <= 10'b0;
 			captured <=  1'b0;
 		end
@@ -281,62 +283,103 @@ module memory (
 	end
 	
 	// set output (read_data) to the 320 samples stored at the location requested (read_addr)
-	assign read_data <= memory[read_addr];
+	always @(posedge CLOCK_50)
+        read_data <= memory[read_addr];
 	
 endmodule
 
 module waveform_renderer (
+    input CLOCK_50,
+    input resetn,
 
-	// vga controller will tell the renderer where it is
-	input [9:0] pixel_x,
-	input [9:0] pixel_y,
-	input video_on,
+    input captured,
+    output startcapture,
 
-	// tells the memory where it wants the value
-	// then receives 12-bit value for voltage
-	output [9:0] sample_address,
-	input [11:0] sample_value,
+    output [8:0] read_addr,
+    input  [11:0] read_data,
 
-	output wire [7:0] VGA_R,
-	output wire [7:0] VGA_G,
-	output wire [7:0] VGA_B );
+    output [8:0] x,
+    output [7:0] y,
+    output [8:0] colour,
+    output plot );
 
-	// scale management
-	// convert 4096 resolution to the vga 480 pixels
-	wire [20:0] scaled_value;
-	wire [9:0] trace_y;
-	wire [9:0] pixel_difference;
+    localparam S_IDLE  = 3'd0,
+               S_CLEAR = 3'd1,
+               S_ADDR  = 3'd2,
+               S_LATCH = 3'd3,
+               S_DRAW  = 3'd4,
+               S_DONE  = 3'd5;
 
-	wire waveform_pixel;
+    reg [2:0] state;
+    reg [8:0] col;
+    reg [7:0] row;
+    reg [7:0] prev_y, cur_y, hi;
 
-	// assign sample_address based on x coord
-	assign sample_address = (pixel_x > 10'd319) ? 10'd319 : pixel_x;
-	
-	// map every possible of sampled to the max height of the vga
-	assign scaled_value = sample_value * 9'd119;
-	assign trace_y = 10'd119 - (scaled_value / 12'd4095);
+    wire [19:0] prod = read_data * 8'd119;
+    wire [7:0]  trace_y = 8'd119 - prod[19:12];
 
-	// distance between current point and next
-	assign pixel_difference =
-        (pixel_y >= trace_y) ?
-        (pixel_y - trace_y) :
-        (trace_y - pixel_y);
+    wire [7:0] lo_next = (col == 9'd0) ? trace_y : (prev_y < trace_y ? prev_y : trace_y);
+    wire [7:0] hi_next = (col == 9'd0) ? trace_y : (prev_y < trace_y ? trace_y : prev_y);
 
-	// requirements to draw
-	// video_on
-	// pixels within frame
-	// 5 pixel waveform
-	assign waveform_pixel =
-		video_on && 
-		(pixel_x < 10'd320) &&
-		(pixel_y < 10'd120) &&
-		(pixel_difference <= 10'd2);
+    assign read_addr = col;
+    assign x = col;
+    assign y = row;
+    assign plot = (state == S_CLEAR) || (state == S_DRAW);
+    assign colour = (state == S_CLEAR) ? 9'b000_000_000 : 9'b000_111_000; // green on black
+    assign startcapture = (state == S_DONE);
 
-	// assign waverform colours
-	// when waveform_pixel is true, screen is green
-	// green on black waveform
-	assign VGA_R = waveform_pixel ? 8'h00 : 8'h00;
-	assign VGA_G = waveform_pixel ? 8'hFF : 8'h00;
-	assign VGA_B = waveform_pixel ? 8'h00 : 8'h00;
+    always @(posedge CLOCK_50) begin
+        if (!resetn) begin
+            state  <= S_IDLE;
+            col    <= 9'd0;
+            row    <= 8'd0;
+            prev_y <= 8'd0;
+            cur_y  <= 8'd0;
+            hi     <= 8'd0;
+        end
+        else begin
+            case (state)
+                S_IDLE: begin
+                    col <= 9'd0;
+                    row <= 8'd0;
+                    if (captured) state <= S_CLEAR;
+                end
 
+                S_CLEAR: begin
+                    if (col == 9'd319) begin
+                        col <= 9'd0;
+                        if (row == 8'd239) begin
+                            row   <= 8'd0;
+                            state <= S_ADDR;
+                        end
+                        else row <= row + 1'b1;
+                    end
+                    else col <= col + 1'b1;
+                end
+
+                S_ADDR: state <= S_LATCH;   // read_addr = col; read_data valid next clock
+
+                S_LATCH: begin
+                    cur_y <= trace_y;
+                    row   <= lo_next;
+                    hi    <= hi_next;
+                    state <= S_DRAW;
+                end
+
+                S_DRAW: begin
+                    if (row == hi) begin
+                        prev_y <= cur_y;
+                        if (col == 9'd319) state <= S_DONE;
+                        else begin
+                            col   <= col + 1'b1;
+                            state <= S_ADDR;
+                        end
+                    end
+                    else row <= row + 1'b1;
+                end
+
+                default: state <= S_IDLE;
+            endcase
+        end
+    end
 endmodule

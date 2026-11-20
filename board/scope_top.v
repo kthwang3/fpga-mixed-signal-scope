@@ -59,7 +59,11 @@ module scope_top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR, G
         .y       (core_y),
         .colour  (core_colour),
         .write   (core_write),
-        .test_wave (test_wave)
+        .test_wave (test_wave),
+        .adc_cs_n (ADC_CS_N),
+        .adc_sclk (ADC_SCLK),
+        .adc_saddr (ADC_DIN),
+        .adc_sdat (ADC_DOUT)
     );
 
     // Board adapter: framebuffer (dual-port RAM) + VGA controller + 25 MHz PLL.
@@ -90,12 +94,6 @@ module scope_top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR, G
     assign GPIO_0[3:0]  = 4'bz;
     assign GPIO_0[4]    = test_wave;
     assign GPIO_0[35:5] = 31'bz;
-
-    // ADC not wired in yet: hold it idle (chip select is active-low, so 1 = off)
-    // until analog_view drives these.
-    assign ADC_CS_N = 1'b1;
-    assign ADC_SCLK = 1'b0;
-    assign ADC_DIN  = 1'b0;
 
 endmodule
 
