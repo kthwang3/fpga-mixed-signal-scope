@@ -1,4 +1,4 @@
-module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, x, y, colour, write, test_wave);
+module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, x, y, colour, write, test_wave, adc_cs_n, adc_saddr, adc_sdat, adc_sclk);
     parameter DV_DELAY = 1666666;   // digital_view redraw delay; desim/top.v overrides to 1000
     parameter CAP_N    = 650;       // gpio_capture: clocks per sample (13 us); desim/top.v overrides
     parameter WAVE_BIT = 15;        // which counter bit is the test square wave; desim/top.v overrides
@@ -15,6 +15,9 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
     output wire [8:0]  colour;
     output wire        write;
     output wire        test_wave;  // built-in square wave, sent out a GPIO pin by scope_top
+
+    output wire adc_cs_n, adc_saddr, adc_sclk;
+    input wire adc_sdat;
 
     assign HEX0 = 7'b1111111;
     assign HEX1 = 7'b1111111;
@@ -44,7 +47,7 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
     wire       cap_full;
     wire       cap_start;
 
-    gpio_capture #(.N(CAP_N)) cap0 (
+    /* gpio_capture #(.N(CAP_N)) cap0 (
         .clk     (clk),
         .resetn  (resetn),
         .start   (cap_start),
@@ -69,6 +72,21 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
         .req           (req),
         .rd_addr       (rd_addr),
         .start_capture (cap_start)
+    ); */
+
+    analog_view d2 (
+        .clk (clk),
+        .resetn (resetn),
+        .grant (1'b0),
+        .xpixel (x),
+        .ypixel (y),
+        .colour (colour),
+        .plot (write),
+        .req (),
+        .adc_cs_n (adc_cs_n),
+        .adc_saddr (adc_saddr),
+        .adc_sclk (adc_sclk),
+        .adc_sdat (adc_sdat)
     );
 
 endmodule

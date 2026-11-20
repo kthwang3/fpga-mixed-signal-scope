@@ -1,4 +1,3 @@
-
 module waveform_renderer (
 
 	// vga controller will tell the renderer where it is
