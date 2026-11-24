@@ -25,16 +25,28 @@ module gpio_capture (clk, resetn, start, gpio_in, rd_addr, rd_data, full);
         sync2 <= sync1;
     end
 
+    reg prev; // hold prev sync2
+    always @(posedge clk)
+        prev <= sync2;
+
+    wire fall = prev & ~sync2; // 1 for one clock when ch0 goes 1 -> 0
+
+    reg armed; // 1 = waiting for trigger
+    always @(posedge clk)
+        if (!resetn || start) armed <= 1'b1;
+        else if (fall) armed <= 1'b0;
+    
+    wire trig = armed && fall;
     always @(posedge clk) rd_data <= mem[rd_addr];
 
     always @(posedge clk)
-        if (!resetn) dec_cnt <= 0;
+        if (!resetn || trig) dec_cnt <= 0;
         else if (tick) dec_cnt <= 0;
         else dec_cnt <= dec_cnt + 1;
     
     always @(posedge clk)
         if (!resetn || start) wr_addr <= 0;
-        else if (tick && !full) begin
+        else if (tick && !full && !armed) begin // you can only write when its take a sample now, and its not full and its not armed
             mem[wr_addr] <= sync2;
             wr_addr <= wr_addr + 1;
         end
