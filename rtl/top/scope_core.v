@@ -34,9 +34,30 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
         else wave_cnt <= wave_cnt + 1;
     assign test_wave = wave_cnt[WAVE_BIT];
 
-    //CH0 source: the switch selects which source. SW[0]=1 -> internal test wave, SW[0]=0 -> real GPIO pin
+    wire [7:0] tx_data;
+    wire tx_send, tx_busy, uart_line;
+
+    msg_seq MSG(
+        .clk (clk),
+        .resetn (resetn),
+        .busy (tx_busy),
+        .data (tx_data),
+        .send (tx_send)
+    );
+
+    uart_tx UTX(
+        .clk(clk),
+        .resetn (resetn),
+        .data(tx_data),
+        .send(tx_send),
+        .tx (uart_line),
+        .busy(tx_busy)
+    );
+
+
+    //CH0 source: the switch selects which source. SW[1]=1 = UART from FPGA, SW[0]=1 -> internal test wave, SW[0]=0 -> real GPIO pin
     // 2 to 1 mux as a ternary operator
-    wire ch0 = SW[0] ? test_wave : gpio_in[0];
+    wire ch0 = SW[1] ? uart_line : (SW[0] ? test_wave : gpio_in[0]);
 
     assign LEDR[0]   = ch0;            // shows what CH0 is seeing (blinks fast = signal present)
     assign LEDR[9:1] = 9'b0;

@@ -22,7 +22,8 @@ set_global_assignment -name VERILOG_FILE ../rtl/top/vga_adapter_board/vga_pll.v
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
 set_global_assignment -name VERILOG_FILE ../rtl/analog/analog_view.v
 set_global_assignment -name VERILOG_FILE ../rtl/top/arbiter.v
-
+set_global_assignment -name VERILOG_FILE ../rtl/digital/uart_tx.v
+set_global_assignment -name VERILOG_FILE ../rtl/digital/msg_seq.v
 
 #============================================================
 # ADC
