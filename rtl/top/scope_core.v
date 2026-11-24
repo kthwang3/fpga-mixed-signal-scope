@@ -59,6 +59,16 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
     // 2 to 1 mux as a ternary operator
     wire ch0 = SW[1] ? uart_line : (SW[0] ? test_wave : gpio_in[0]);
 
+    wire [7:0] rx_byte;
+    wire rx_valid;
+    uart_rx URX (
+        .clk (clk),
+        .resetn (resetn),
+        .rx (ch0),
+        .data (rx_byte),
+        .valid (rx_valid)
+    );
+
     assign LEDR[0]   = ch0;            // shows what CH0 is seeing (blinks fast = signal present)
     assign LEDR[9:1] = 9'b0;
 
