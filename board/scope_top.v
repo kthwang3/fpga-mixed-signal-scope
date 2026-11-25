@@ -45,8 +45,9 @@ module scope_top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR, G
     wire       core_write;
     wire       test_wave;
 
-    // No DV_DELAY override: the board uses scope_core's default (~30 redraws/sec)
-    scope_core CORE (
+    // Board timing uses scope_core's defaults; only the font path changes
+    // (Quartus runs from board/, so the path is relative to that folder)
+    scope_core #(.FONT_FILE("../rtl/digital/font8x8.hex")) CORE (
         .clk     (CLOCK_50),
         .resetn  (KEY[0]),
         .SW      (SW),

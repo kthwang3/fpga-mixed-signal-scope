@@ -25,6 +25,8 @@ set_global_assignment -name VERILOG_FILE ../rtl/top/arbiter.v
 set_global_assignment -name VERILOG_FILE ../rtl/digital/uart_tx.v
 set_global_assignment -name VERILOG_FILE ../rtl/digital/msg_seq.v
 set_global_assignment -name VERILOG_FILE ../rtl/digital/uart_rx.v
+set_global_assignment -name VERILOG_FILE ../rtl/digital/byte_log.v
+set_global_assignment -name VERILOG_FILE ../rtl/digital/font_rom.v
 
 #============================================================
 # ADC

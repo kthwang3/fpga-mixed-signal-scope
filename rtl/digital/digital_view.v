@@ -1,4 +1,4 @@
-module digital_view (clk, resetn, grant, sample, ready, x, y, colour, plot, req, rd_addr, start_capture);
+module digital_view (clk, resetn, grant, sample, ready, x, y, font_bits, colour, plot, req, rd_addr, start_capture, text_idx, text_row);
 
     input wire clk;
     input wire resetn;
@@ -12,6 +12,16 @@ module digital_view (clk, resetn, grant, sample, ready, x, y, colour, plot, req,
     output wire req;
     output wire [8:0] rd_addr;      // which column's sample to read from gpio_capture
     output wire start_capture;      // pulse: tell gpio_capture to record again
+
+    output [5:0] text_idx;   // which character slot (x/8)
+    output [2:0] text_row;   // which row of the character
+    input  [7:0] font_bits;  // 8 pixels of that row, from font_rom
+
+    wire [7:0] ty = y - 8'd122;
+    wire on_text = (y >= 122) && (y <= 129);
+    assign text_idx = x[8:3];
+    assign text_row = ty[2:0];
+    wire text_pixel = font_bits[7 - x[2:0]];
 
     parameter DELAY = 1666666;   // 50 MHz / 30 ≈ 1.67M clks → redraw ~30 times/sec (board). DESim overrides to 1000, ModelSim to 5.
     reg [20:0] delay_cnt;
@@ -52,7 +62,8 @@ module digital_view (clk, resetn, grant, sample, ready, x, y, colour, plot, req,
     wire on_edge  = (s != s_prev) && (y >= HIGH) && (y <= LOW); // vertical line where it switches
     wire on_trace = on_level || on_edge;
 
-    assign colour = on_trace ? 9'b000_111_000 : 9'b000_000_000; // green trace, black elsewhere (erases)
+    assign colour = on_text  ? (text_pixel ? 9'b111_111_111 : 9'b000_000_000) :
+        on_trace ? 9'b000_111_000 : 9'b000_000_000; // white text, green trace, black elsewhere (erases)
     assign plot = y_Q[2] && grant;
 
     always @(posedge clk)

@@ -35,7 +35,9 @@ module top (CLOCK_50, SW, KEY, HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, LEDR,
     //   redraw after 1000 clocks instead of ~1.67M,
     //   sample every 10 clocks instead of 650 (a recording takes 3200 clocks),
     //   test wave from counter bit 9 instead of 15 (same ~3 periods on screen)
-    scope_core #(.DV_DELAY(1000), .CAP_N(10), .WAVE_BIT(9)) CORE (
+    //   font path is relative to desim/sim, where DESim runs
+    scope_core #(.DV_DELAY(1000), .CAP_N(10), .WAVE_BIT(9),
+                 .FONT_FILE("../../rtl/digital/font8x8.hex")) CORE (
         .clk     (CLOCK_50),
         .resetn  (KEY[0]),
         .SW      (SW),

@@ -2,6 +2,7 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
     parameter DV_DELAY = 1666666;   // digital_view redraw delay; desim/top.v overrides to 1000
     parameter CAP_N    = 650;       // gpio_capture: clocks per sample (13 us); desim/top.v overrides
     parameter WAVE_BIT = 15;        // which counter bit is the test square wave; desim/top.v overrides
+    parameter FONT_FILE = "font8x8.hex"; // path to the font, relative to where the tool runs; wrappers override
 
     input  wire        clk;   // 50 MHz clock
     input  wire        resetn;
@@ -69,6 +70,24 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
         .valid (rx_valid)
     );
 
+    wire [5:0] text_idx;
+    wire [2:0] text_row;
+    wire [7:0] log_char, font_bits;
+
+    byte_log LOG (
+        .clk(clk), 
+        .resetn(resetn), 
+        .in_byte(rx_byte), 
+        .in_valid(rx_valid),
+        .rd_idx(text_idx), 
+        .rd_char(log_char)
+    );
+    font_rom #(.FONT_FILE(FONT_FILE)) FONT (
+        .char(log_char[6:0]), 
+        .row(text_row), 
+        .bits(font_bits)
+    );
+
     assign LEDR[0]   = ch0;            // shows what CH0 is seeing (blinks fast = signal present)
     assign LEDR[9:1] = 9'b0;
 
@@ -108,7 +127,10 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
         .colour        (dv_colour),
         .plot          (dv_plot),
         .rd_addr       (rd_addr),
-        .start_capture (cap_start)
+        .start_capture (cap_start),
+        .text_idx (text_idx),
+        .text_row(text_row),
+        .font_bits(font_bits)
     );
 
     analog_view d2 (
