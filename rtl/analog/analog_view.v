@@ -6,7 +6,6 @@ module analog_view (clk, resetn, grant, xpixel, ypixel, colour, plot, req, adc_c
     // arbiter
     input wire grant;
     output wire req;
-    assign req = 1'b0;
 
     // vga
     output wire [8:0] xpixel;
@@ -323,7 +322,7 @@ module waveform_renderer (
 
 	wire drawing = (state == S_CLEAR) || (state == S_DRAW);
     assign req  = (state == S_CLEAR) || (state == S_ADDR) || (state == S_LATCH) || (state == S_DRAW);
-    assign plot = drawing && gnt;
+    assign plot = drawing && grant;
 
     wire [19:0] prod = read_data * 8'd119;
     wire [7:0]  trace_y = 8'd119 - prod[19:12];
@@ -334,7 +333,6 @@ module waveform_renderer (
     assign read_addr = col;
     assign x = col;
     assign y = row;
-    assign plot = (state == S_CLEAR) || (state == S_DRAW);
     assign colour = (state == S_CLEAR) ? 9'b000_000_000 : 9'b000_111_000; // green on black
     assign startcapture = (state == S_DONE);
 
