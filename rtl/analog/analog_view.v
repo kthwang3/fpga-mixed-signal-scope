@@ -355,9 +355,9 @@ module waveform_renderer (
 
                 S_CLEAR: begin
 					if (grant) begin
-						if (col == 9'd159) begin
+						if (col == 9'd319) begin
 							col <= 9'd0;
-							if (row == 8'd239) begin
+							if (row == 8'd119) begin
 								row   <= 8'd0;
 								state <= S_ADDR;
 							end
