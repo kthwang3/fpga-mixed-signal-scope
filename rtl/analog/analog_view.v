@@ -64,8 +64,8 @@ module analog_view (clk, resetn, grant, xpixel, ypixel, colour, plot, req, adc_c
         .x (xpixel),
         .y (ypixel),
         .colour (colour),
-        .plot (plot)
-		.grant (grant)
+        .plot (plot),
+		.grant (grant),
 		.req (req)
     );
 
@@ -355,7 +355,7 @@ module waveform_renderer (
 
                 S_CLEAR: begin
 					if (grant) begin
-						if (col == 9'd319) begin
+						if (col == 9'd159) begin
 							col <= 9'd0;
 							if (row == 8'd239) begin
 								row   <= 8'd0;
