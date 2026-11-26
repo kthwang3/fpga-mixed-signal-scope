@@ -154,7 +154,7 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
         .g ({av_grant, dv_grant})
     );
 
-    wire use_analog = av_grant | SW[9];   // SW[9] = temporary override, see below
+    wire use_analog = av_grant;   // SW[9] = temporary override, see below
     assign x      = use_analog ? av_x      : dv_x;
     assign y      = use_analog ? av_y      : dv_y;
     assign colour = use_analog ? av_colour : dv_colour;
