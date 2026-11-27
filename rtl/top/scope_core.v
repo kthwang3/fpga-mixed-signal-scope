@@ -145,7 +145,7 @@ module scope_core (clk, resetn, SW, KEY, gpio_in, LEDR, HEX0, HEX1, HEX2, HEX3, 
         .adc_cs_n (adc_cs_n),
         .adc_saddr (adc_saddr),
         .adc_sclk (adc_sclk),
-        .adc_sdat (adc_sdat)
+        .adc_sdat (adc_sdat),
         .lvl (SW[9:7]),
         .pos (SW[6:4]),
         .mode (SW[3:2]),
