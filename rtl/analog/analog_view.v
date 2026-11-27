@@ -1,4 +1,4 @@
-module analog_view (clk, resetn, grant, xpixel, ypixel, colour, plot, req, adc_cs_n, adc_saddr, adc_sclk, adc_sdat);
+module analog_view (clk, resetn, grant, xpixel, ypixel, colour, plot, req, adc_cs_n, adc_saddr, adc_sclk, adc_sdat, lvl, pos, mode, slope, arm);
 
     input wire clk;
     input wire resetn;
@@ -12,6 +12,13 @@ module analog_view (clk, resetn, grant, xpixel, ypixel, colour, plot, req, adc_c
     output wire [7:0] ypixel;
     output wire [8:0] colour;
     output wire plot;
+
+	// trigger
+	input wire [2:0] lvl;
+	input wire [2:0] pos;
+	input wire [1:0] mode;
+	input slope;
+	input arm;
     
     wire busy, data_valid, start, captured, startcapture;
 
@@ -43,7 +50,7 @@ module analog_view (clk, resetn, grant, xpixel, ypixel, colour, plot, req, adc_c
         .busy (busy)
     );
 
-    memory MEMORY (
+    trigger_memory MEMORY (
         .CLOCK_50 (clk),
         .resetn (resetn),
         .adc_data (adc_data),
@@ -51,7 +58,12 @@ module analog_view (clk, resetn, grant, xpixel, ypixel, colour, plot, req, adc_c
         .read_addr (read_addr),
         .read_data (read_data),
         .captured (captured),
-        .startcapture (startcapture)
+        .startcapture (startcapture),
+		.lvl (lvl),
+		.pos (pos),
+		.mode (mode),
+		.slope (slope),
+		.arm (arm)
     );
 
     waveform_renderer RENDERER (
@@ -243,50 +255,143 @@ module adc_controller #(
 	end
 endmodule
 
-module memory (
-	input CLOCK_50,
+module trigger_memory #(parameter AUTO_TIMEOUT = 2000)(
+
+	// from adc
+    input CLOCK_50, 
 	input resetn,
+    input [11:0] adc_data, 
+	input data_valid, 
+	input startcapture,
+
+	// from trigger control
+    input [2:0] lvl, 
+	input [2:0] pos, 
+	input [1:0] mode, 
+	input slope, 
+	input arm,
+
+	// from and to waveform renderer
+    input [8:0] read_addr, 
+	output reg [11:0] read_data, 
+	output reg captured);
 	
-	input [11:0] adc_data,
-	input data_valid,
-    input startcapture,
+	// trigger modes
+    localparam 	M_NORMAL = 2'd1,
+				M_SINGLE = 2'd2;
+
+	// trigger states
+    localparam 	S_ARMED = 3'd0, 
+				S_POST = 3'd1, 
+				S_HOLD = 3'd2, 
+				S_STOP = 3'd3;
 	
-	input [8:0] read_addr, // 10 bits to store up to 640 samples
-	
-	output reg captured,
-    output reg [11:0] read_data );
-	
-	// memory is in sample units
-	// each sample contains 12 bits
-	reg [11:0] memory [0:319];
-	reg [9:0] write_addr;
-	
-	always @(posedge CLOCK_50) begin
-		
-		if (!resetn || startcapture) begin
-			write_addr <= 10'b0;
-			captured <=  1'b0;
-		end
-		
+    reg [11:0] memory [0:639]; // array stores up to 640 to accomodate for pre and post trigger
+    reg [8:0] wp, base; // wp is location in memory where adc will write
+    reg [9:0] fill, post_cnt, post_n, start_l;
+    reg [2:0] state;
+    reg [11:0] prev;
+    reg [15:0] auto_cnt;
+    wire [11:0] level = ({1'b0, lvl} + 4'd1) * 12'd500;
+    wire [9:0] pre = pos * 10'd40;
+    wire rising = (prev < level) && (adc_data >= level);
+    wire falling = (prev >= level) && (adc_data < level);
+    wire hit = slope ? rising : falling;
+    wire pre_ready = (fill >= pre) && (fill != 10'd0); // pretrigger ready
+    wire forced = (mode != M_NORMAL) && (mode != M_SINGLE) && (auto_cnt >= AUTO_TIMEOUT);
+    wire [8:0] wp_next = (wp == 9'd319) ? 9'd0 : wp + 1'b1;
+
+    reg we; reg [9:0] waddr; // write enable, write address
+
+    always @(*) begin
+        we = 1'b0; waddr = 10'd0; // 1 bit stores enable on/off states; 10 bits stores > 640 addresses
+        if (data_valid) begin // adc value stored ok
+
+            if (state == S_ARMED) begin // triggered
+                we = 1'b1; // enable write
+                waddr = (pre_ready && (hit || forced)) ? 10'd320 : {1'b0, wp}; // either auto or edge is seen + pretriggered
+            end 
+
+			else if (state == S_POST && post_cnt < post_n) begin // if it is post trigger and more samples needed
+                we = 1'b1; // enable write
+                waddr = 10'd320 + post_cnt;
+            end
+
+        end
+    end
+
+    always @(posedge CLOCK_50) if (we) memory[waddr] <= adc_data; // write into memory
+
+    always @(posedge CLOCK_50) begin
+
+        if (!resetn) begin
+            state <= S_ARMED; 
+			wp <= 0; 
+			base <= 0; 
+			fill <= 0;
+            post_cnt <= 0; 
+			post_n <= 0; 
+			start_l <= 0;
+            prev <= 0; 
+			auto_cnt <= 0; 
+			captured <= 0;
+        end 
 		else begin
-		
-			// memory can only start writing if it is NOT DONE (captured) and ADC is done sampling
-			if (data_valid && !captured) begin
-			
-				// memory stores the 12 bit value
-				memory[write_addr] <= adc_data;
-				
-				// capture once 640 samples
-				if (write_addr == 10'd319) captured <= 1'b1;
-				else write_addr <= write_addr + 1'b1;
-			end
+			case (state)
+
+				S_ARMED: if (data_valid) begin
+					prev <= adc_data;
+					if (auto_cnt != 16'hFFFF) auto_cnt <= auto_cnt + 1'b1; // no timeout
+					if (pre_ready && (hit || forced)) begin // ready to be triggered
+						post_cnt <= 10'd1;
+						post_n <= 10'd320 - pre;
+						start_l <= 10'd320 - pre;
+						base <= wp;
+						state <= S_POST;
+					end 
+					else begin // not ready to be triggered
+						wp <= wp_next;
+						if (fill < 10'd320) fill <= fill + 1'b1; // continue counting # of samples in pre state
+					end
+				end
+
+				S_POST: if (data_valid) begin
+					if (post_cnt >= post_n) begin // enough post samples
+						captured <= 1'b1; // declare sample done
+						state <= S_HOLD;
+					end 
+					else begin
+						post_cnt <= post_cnt + 1'b1; // not enough post samples
+						if (post_cnt + 1'b1 >= post_n) begin
+							captured <= 1'b1;
+							state <= S_HOLD;
+						end
+					end
+				end
+
+				S_HOLD: if (startcapture) begin // reset memory counts
+					captured <= 1'b0; 
+					fill <= 0; 
+					auto_cnt <= 0;
+					state <= (mode == M_SINGLE) ? S_STOP : S_ARMED;
+				end
+
+				S_STOP: if (arm || mode != M_SINGLE) begin // new sample required if not single capture or if new capture requested in single mode
+					fill <= 0; 
+					auto_cnt <= 0; 
+					state <= S_ARMED;
+				end
+
+    		endcase
 		end
-	end
-	
-	// set output (read_data) to the 320 samples stored at the location requested (read_addr)
-	always @(posedge CLOCK_50)
-        read_data <= memory[read_addr];
-	
+    end
+
+	// waveform renderer
+    wire [9:0] logical = start_l + read_addr;
+    wire [9:0] p = base + logical;
+    wire [9:0] phys = (logical >= 10'd320) ? logical : (p >= 10'd320) ? p - 10'd320 : p;
+    always @(posedge CLOCK_50) read_data <= memory[phys];
+
 endmodule
 
 module waveform_renderer (
@@ -315,17 +420,20 @@ module waveform_renderer (
                S_DRAW  = 3'd4, // draw horizontal lines
                S_DONE  = 3'd5; // done drawing
 
+	localparam [10:0] SCALE = 11'd1560;   // 119/4095 * 2^16 *(4.096/5)
+
     reg [2:0] state;
     reg [8:0] col;
     reg [7:0] row;
     reg [7:0] prev_y, cur_y, hi;
 
-	wire drawing = (state == S_CLEAR) || (state == S_DRAW);
-    assign req  = (state == S_CLEAR) || (state == S_ADDR) || (state == S_LATCH) || (state == S_DRAW);
-    assign plot = drawing && grant;
+	wire drawing = (state == S_CLEAR) || (state == S_DRAW); // any time pixels are being written
+    assign req  = (state == S_CLEAR) || (state == S_ADDR) || (state == S_LATCH) || (state == S_DRAW); // in any state during write, req high
+    assign plot = drawing && grant; // plot when allowed by grant and when drawing
 
-    wire [19:0] prod = read_data * 8'd119;
-    wire [7:0]  trace_y = 8'd119 - prod[19:12];
+	wire [22:0] prod    = read_data * SCALE;
+	wire [6:0]  y_off   = prod[22:16]; // divide by shiftin 16 bits
+	wire [7:0]  trace_y = 8'd119 - y_off; // draw down up instead of up down
 
     wire [7:0] lo_next = (col == 9'd0) ? trace_y : (prev_y < trace_y ? prev_y : trace_y);
     wire [7:0] hi_next = (col == 9'd0) ? trace_y : (prev_y < trace_y ? trace_y : prev_y);
@@ -380,7 +488,7 @@ module waveform_renderer (
 					if (grant) begin
 						if (row == hi) begin
 							prev_y <= cur_y;
-							if (col == 9'd319) state <= S_DONE;
+							if (col == 9'd319) state <= S_DONE; // after writing across entire screen
 							else begin
 								col   <= col + 1'b1;
 								state <= S_ADDR;
@@ -398,14 +506,136 @@ endmodule
 
 /*
 module trigger (
-	input [2:0] lvl
-	input [2:0] pos
-	input slope
-	input on
-
-	output 
+	input [2:0] lvl, // SW[6:4]
+	input [2:0] pos, // SW[9:7]
+	input [1:0] mode, // SW[3:2]
+	input [11:0] read_data // 12-bit ADC signal
+	input slope, // KEY[2]
 )
+	// lvl only 3 bits (8); map onto 12-bit ADC reading
+
+	read_y = (lvl/3'd7) * 12'd4095; // trigger sets as a % of max value (trigger values ~0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4)
+	read_x = (pos/3'd7) 
+
+	// FSM for trigger modes
+
+	localparam	AUTO = 3'd0;
+				NORMAL = 3'd1;
+				SINGLE = 3'd2;
+	
+	case (mode)
+		AUTO: begin
+			waveform_renderer AUTO (
+			.
+			);
 
 
+endmodule
+
+module waveform_renderer (
+
+	input grant,
+	output req,
+
+    input CLOCK_50,
+    input resetn,
+
+    input captured,
+    output startcapture,
+
+    output [8:0] read_addr,
+    input  [11:0] read_data,
+
+    output [8:0] x,
+    output [7:0] y,
+    output [8:0] colour,
+    output plot );
+
+    localparam S_IDLE  = 3'd0, // waiting for capture
+               S_CLEAR = 3'd1, // black out screen
+               S_ADDR  = 3'd2, // idle for 1 clk
+               S_LATCH = 3'd3, // fill in vertical gap between levels
+               S_DRAW  = 3'd4, // draw horizontal lines
+               S_DONE  = 3'd5; // done drawing
+
+    reg [2:0] state;
+    reg [8:0] col;
+    reg [7:0] row;
+    reg [7:0] prev_y, cur_y, hi;
+
+	wire drawing = (state == S_CLEAR) || (state == S_DRAW); // any time pixels are being written
+    assign req  = (state == S_CLEAR) || (state == S_ADDR) || (state == S_LATCH) || (state == S_DRAW); // in any state during write, req high
+    assign plot = drawing && grant; // plot when allowed by grant and when drawing
+
+    wire [19:0] prod = read_data * 8'd119; // map each value onto a pixel
+    wire [7:0] trace_y = 8'd119 - (prod[19:0]/12'd4096); // ADC reading as a % of 5V mapped onto 119 pixels
+
+    wire [7:0] lo_next = (col == 9'd0) ? trace_y : (prev_y < trace_y ? prev_y : trace_y);
+    wire [7:0] hi_next = (col == 9'd0) ? trace_y : (prev_y < trace_y ? trace_y : prev_y);
+
+    assign read_addr = col;
+    assign x = col;
+    assign y = row;
+    assign colour = (state == S_CLEAR) ? 9'b000_000_000 : 9'b000_111_000; // green on black
+    assign startcapture = (state == S_DONE);
+
+    always @(posedge CLOCK_50) begin
+        if (!resetn) begin
+            state  <= S_IDLE;
+            col    <= 9'd0; // column
+            row    <= 8'd0; // row
+            prev_y <= 8'd0; // previous y value
+            cur_y  <= 8'd0; // current y value
+            hi     <= 8'd0;
+        end
+        else begin
+            case (state)
+                S_IDLE: begin
+                    col <= 9'd0;
+                    row <= 8'd0;
+                    if (captured) state <= S_CLEAR;
+                end
+
+                S_CLEAR: begin
+					if (grant) begin
+						if (col == 9'd319) begin
+							col <= 9'd0;
+							if (row == 8'd119) begin
+								row   <= 8'd0;
+								state <= S_ADDR;
+							end
+							else row <= row + 1'b1;
+						end
+						else col <= col + 1'b1;
+					end
+                end
+
+                S_ADDR: state <= S_LATCH;   // read_addr = col; read_data valid next clock
+
+                S_LATCH: begin
+                    cur_y <= trace_y;
+                    row   <= lo_next;
+                    hi    <= hi_next;
+                    state <= S_DRAW;
+                end
+
+                S_DRAW: begin
+					if (grant) begin
+						if (row == hi) begin
+							prev_y <= cur_y;
+							if (col == 9'd319) state <= S_DONE; // after writing across entire screen
+							else begin
+								col   <= col + 1'b1;
+								state <= S_ADDR;
+							end
+						end
+						else row <= row + 1'b1;
+					end
+                end
+
+                default: state <= S_IDLE;
+            endcase
+        end
+    end
 endmodule
 */
